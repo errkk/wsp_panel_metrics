@@ -19,7 +19,7 @@ int flowState = 0;
 int lastFlowState = 0;
 
 unsigned long lastTick;
-int timeBetweenTicks = 0;
+long timeBetweenTicks = 0;
 float litersPerSec = 0;
 
 
