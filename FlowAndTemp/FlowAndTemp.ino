@@ -37,7 +37,7 @@ int serverPort = 80;
 
 unsigned long lastConnectionTime = 0;          // last time you connected to the server, in milliseconds
 boolean lastConnected = false;                 // state of the connection last time through the main loop
-const unsigned long postingInterval = 10 * 1000; // delay between updates, in milliseconds
+const unsigned long postingInterval = 30 * 1000; // delay between updates, in milliseconds
 
 // Temporary buffer for converting floats
 char stringBuffer[10];
@@ -54,6 +54,20 @@ unsigned long lastTick;
 long timeBetweenTicks = 0;
 float litersPerSec = 0;
 
+float t1 = 0;
+float t2 = 0;
+float t3 = 0;
+
+// LDR stuff
+const int numReadings = 5;
+
+int readings[numReadings];      // the readings from the analog input
+int readIndex = 0;              // the index of the current reading
+int total = 0;                  // the running total
+int average = 0;                // the average
+
+int inputPin = A1;
+
 void setup() {
 
   Serial.begin(9600);
@@ -62,12 +76,15 @@ void setup() {
 
   // put your setup code here, to run once:
   pinMode(flowMeterPin, INPUT);
+  pinMode(13, OUTPUT);
 
   for (int i = 0; i < 3; i++)
   {
     lcd.backlight();
+    digitalWrite(13, HIGH);
     delay(250);
     lcd.noBacklight();
+    digitalWrite(13, LOW);
     delay(250);
   }
   lcd.backlight();
@@ -75,6 +92,10 @@ void setup() {
   lcd.setCursor(0, 0);
   lcd.print("Starting up");
   Serial.println("Starting");
+
+  for (int thisReading = 0; thisReading < numReadings; thisReading++) {
+    readings[thisReading] = 0;
+  }
 
   delay(1500);
 
@@ -98,17 +119,17 @@ void setup() {
 }
 
 void loop() {
-  lcd.setCursor(19, 0);
-  lcd.print(" ");  
   
   flowState = digitalRead(flowMeterPin);
+  digitalWrite(13, LOW);
 
   // compare the flowStates to its previous state
   if (flowState != lastFlowState) {
-    if (flowState == HIGH) {
+    if (flowState == LOW) {
       flowCounter++;
       Serial.print("Liters:  ");
       Serial.println(flowCounter * litersPerTick);
+      digitalWrite(13, HIGH);
 
       unsigned long newTime = millis();
 
@@ -122,6 +143,7 @@ void loop() {
       Serial.print(" ms / ");
       Serial.print(litersPerSec, 4);
       Serial.println(" L/Sec");
+      
       lcd.setCursor(0, 3);
       lcd.print("Flow:   ");
       lcd.print(litersPerSec, 2);
@@ -138,27 +160,66 @@ void loop() {
 
   // request to all devices on the bus
 
-  sensors.requestTemperatures(); // Send the command to get temperatures
-
-  float t1 = sensors.getTempCByIndex(0);
-  float t2 = sensors.getTempCByIndex(1);
+  sensors.requestTemperatures(); // Send the command to get temperature
+  
   float uplift = t2 - t1;
   float power = 1000.0 * litersPerSec * uplift * 4.2;
 
   lcd.setCursor(0, 0);
-  lcd.print("Tank:   ");
+  lcd.print("In: ");
   lcd.print(t1);
-  lcd.print(" C");
-  lcd.setCursor(0, 1);
-  lcd.print("Panel:  ");
+  lcd.setCursor(10, 0);
+  lcd.print("Out: ");
   lcd.print(t2);
-  lcd.print(" C");
+  lcd.setCursor(0, 1);
+  lcd.print("Tank: ");
+  lcd.print(t3);
+  
   lcd.setCursor(0, 2);
-  lcd.print("Power:  ");
+  lcd.print("Pow: ");
   lcd.print(power);
-  lcd.print(" W");
+  
+  // subtract the last reading:
+  total = total - readings[readIndex];
+  // read from the sensor:
+  readings[readIndex] = analogRead(inputPin);
+  // add the reading to the total:
+  total = total + readings[readIndex];
+  // advance to the next position in the array:
+  readIndex = readIndex + 1;
 
+  // if we're at the end of the array...
+  if (readIndex >= numReadings) {
+    // ...wrap around to the beginning:
+    readIndex = 0;
+  }
 
+  // calculate the average:
+  average = total / numReadings;
+  
+  lcd.setCursor(10, 2);
+  lcd.print("L: ");
+  lcd.print(average);
+ 
+  // call sensors.requestTemperatures() to issue a global temperature
+  // request to all devices on the bus
+  sensors.requestTemperatures();
+
+  float tt1 = sensors.getTempCByIndex(0);
+  float tt2 = sensors.getTempCByIndex(1);
+  float tt3 = sensors.getTempCByIndex(2);
+
+  if(tt1 > 0) {
+    t1 = tt1;
+  }
+
+  if(tt2 > 0) {
+    t2 = tt2;
+  }
+
+  if(tt3 > 0) {
+    t3 = tt3;
+  }
 
 
   // if there's incoming data from the net connection.
@@ -191,15 +252,8 @@ void loop() {
 
 
 void httpRequest() {
-  // call sensors.requestTemperatures() to issue a global temperature
-  // request to all devices on the bus
-  sensors.requestTemperatures();
 
-  float t1 = sensors.getTempCByIndex(0);
-  float t2 = sensors.getTempCByIndex(1);
-  float t3 = sensors.getTempCByIndex(2);
 
-  
   String PostData = "t1=";
 
   // Convert the floats to strings using the char buffers t1s and t2s
@@ -217,13 +271,16 @@ void httpRequest() {
   dtostrf(litersPerSec, 6, 2, stringBuffer);
   PostData = String(PostData + "&flow=");
   PostData = String(PostData + stringBuffer);
+
+  
+  dtostrf(average, 6, 2, stringBuffer);
+  PostData = String(PostData + "&light=");
+  PostData = String(PostData + stringBuffer);
   
   Serial.println(PostData);
 
   // if there's a successful connection:
   if (client.connect(server, serverPort)) {
-    lcd.setCursor(18, 0);
-    lcd.print("c");    
     
     Serial.println("Connecting...");
     // send the HTTP POST request:
