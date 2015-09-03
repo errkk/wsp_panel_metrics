@@ -176,7 +176,8 @@ void loop() {
   lcd.print(t3);
   
   lcd.setCursor(0, 2);
-  lcd.print("Pow: ");
+  lcd.print("Pow:      ");
+  lcd.setCursor(5, 2);
   lcd.print(power);
   
   // subtract the last reading:
@@ -198,7 +199,8 @@ void loop() {
   average = total / numReadings;
   
   lcd.setCursor(10, 2);
-  lcd.print("L: ");
+  lcd.print("L:        "); // Blank it out
+  lcd.setCursor(13, 2);
   lcd.print(average);
  
   // call sensors.requestTemperatures() to issue a global temperature
