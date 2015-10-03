@@ -4,8 +4,15 @@
 #include <Ethernet.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include "TSL2561.h"
 
+//I2C Addresses
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
+// The address will be different depending on whether you let
+// the ADDR pin float (addr 0x39), or tie it to ground or vcc. In those cases
+// use TSL2561_ADDR_LOW (0x29) or TSL2561_ADDR_HIGH (0x49) respectively
+TSL2561 tsl(TSL2561_ADDR_FLOAT); 
+
 
 #define ONE_WIRE_BUS 7
 
@@ -58,21 +65,20 @@ float t1 = 0;
 float t2 = 0;
 float t3 = 0;
 
-// LDR stuff
-const int numReadings = 5;
+// Var to hold light reading
+uint16_t lux;
 
-int readings[numReadings];      // the readings from the analog input
-int readIndex = 0;              // the index of the current reading
-int total = 0;                  // the running total
-int average = 0;                // the average
-
-int inputPin = A1;
 
 void setup() {
 
   Serial.begin(9600);
   lcd.begin(20, 4);
   sensors.begin();
+
+  // Set up light sensor
+  if (tsl.begin()) {
+    Serial.println("Found sensor");
+  }
 
   // put your setup code here, to run once:
   pinMode(flowMeterPin, INPUT);
@@ -93,10 +99,6 @@ void setup() {
   lcd.print("Starting up");
   Serial.println("Starting");
 
-  for (int thisReading = 0; thisReading < numReadings; thisReading++) {
-    readings[thisReading] = 0;
-  }
-
   delay(1500);
 
   if (Ethernet.begin(mac) == 0) {
@@ -116,6 +118,11 @@ void setup() {
   lcd.print(Ethernet.localIP());
   delay(2000);
   lcd.clear();
+
+  // You can change the gain on the fly, to adapt to brighter/dimmer light situations
+  //tsl.setGain(TSL2561_GAIN_0X);         // set no gain (for bright situtations)
+  tsl.setGain(TSL2561_GAIN_16X);      // set 16x gain (for dim situations)
+  tsl.setTiming(TSL2561_INTEGRATIONTIME_13MS);  // shortest integration time (bright light)  
 }
 
 void loop() {
@@ -180,28 +187,12 @@ void loop() {
   lcd.setCursor(5, 2);
   lcd.print(power);
   
-  // subtract the last reading:
-  total = total - readings[readIndex];
-  // read from the sensor:
-  readings[readIndex] = analogRead(inputPin);
-  // add the reading to the total:
-  total = total + readings[readIndex];
-  // advance to the next position in the array:
-  readIndex = readIndex + 1;
-
-  // if we're at the end of the array...
-  if (readIndex >= numReadings) {
-    // ...wrap around to the beginning:
-    readIndex = 0;
-  }
-
-  // calculate the average:
-  average = total / numReadings;
+  lux = tsl.getLuminosity(TSL2561_VISIBLE);
   
   lcd.setCursor(10, 2);
-  lcd.print("L:        "); // Blank it out
+  lcd.print("Lux: "); // Blank it out
   lcd.setCursor(13, 2);
-  lcd.print(average);
+  lcd.print(lux, DEC);
  
   // call sensors.requestTemperatures() to issue a global temperature
   // request to all devices on the bus
@@ -275,7 +266,7 @@ void httpRequest() {
   PostData = String(PostData + stringBuffer);
 
   
-  dtostrf(average, 6, 2, stringBuffer);
+  dtostrf(lux, 6, 2, stringBuffer);
   PostData = String(PostData + "&light=");
   PostData = String(PostData + stringBuffer);
   
