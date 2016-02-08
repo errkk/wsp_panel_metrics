@@ -53,6 +53,8 @@ Adafruit_MQTT_Publish t3Feed = Adafruit_MQTT_Publish(&mqtt, TEMPERATURE_FEED_3);
 
 const char PUMP_FEED[] PROGMEM = BROKER_USERNAME "/hardware/pump";
 Adafruit_MQTT_Subscribe pump = Adafruit_MQTT_Subscribe(&mqtt, PUMP_FEED);
+const char PUMP_SPEED_FEED[] PROGMEM = BROKER_USERNAME "/hardware/pumpspeed";
+Adafruit_MQTT_Subscribe pumpspeed = Adafruit_MQTT_Subscribe(&mqtt, PUMP_SPEED_FEED);
 
 /*************************** Setup Peripherals ************************************/
 // Lux sensor
@@ -73,6 +75,7 @@ float t3;
 
 // Var to hold light reading
 uint16_t lux;
+uint32_t x=0; // TMP
 
 // Power vars
 const int flowMeterPin = 3;
@@ -115,8 +118,6 @@ void setup() {
 
 }
 
-uint32_t x=0;
-
 void loop() {
     /// Connection ___________________________________
     // Ensure the connection to the MQTT server is alive (this will make the first
@@ -130,6 +131,11 @@ void loop() {
         if (subscription == &pump) {
             Serial.print(F("Pump: "));
             Serial.println((char *)pump.lastread);
+
+        } else if (subscription == &pump) {
+            Serial.print(F("Pump Speed: "));
+            Serial.println((char *)pumpspeed.lastread);
+        }
         }
     }
 
