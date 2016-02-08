@@ -8,6 +8,7 @@
 
 //I2C Addresses
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
+
 // The address will be different depending on whether you let
 // the ADDR pin float (addr 0x39), or tie it to ground or vcc. In those cases
 // use TSL2561_ADDR_LOW (0x29) or TSL2561_ADDR_HIGH (0x49) respectively
@@ -39,7 +40,7 @@ byte mac[] = {
 // initialize the library instance:
 EthernetClient client;
 
-char server[] = "api.cloudstitch.com";
+char server[] = "data.sparkfun.com";
 int serverPort = 80;
 
 unsigned long lastConnectionTime = 0;          // last time you connected to the server, in milliseconds
@@ -61,9 +62,9 @@ unsigned long lastTick;
 long timeBetweenTicks = 0;
 float litersPerSec = 0;
 
-float t1 = 0;
-float t2 = 0;
-float t3 = 0;
+float t1 = 12.12;
+float t2 = 22.22;
+float t3 = 33.42;
 
 // Var to hold light reading
 uint16_t lux;
@@ -249,7 +250,7 @@ void httpRequest() {
 
   String PostData = "t1=";
 
-  // Convert the floats to strings using the char buffers t1s and t2s
+  // Convert the floats to strings using the char buffer
   dtostrf(t1, 6, 2, stringBuffer);
   PostData = String(PostData + stringBuffer);
   
@@ -277,14 +278,14 @@ void httpRequest() {
     
     Serial.println("Connecting...");
     // send the HTTP POST request:
-    client.println("POST /errkk/magic-form-1/datasources/sheet/ HTTP/1.1");
-    client.println("Host: api.cloudstitch.com");
+    client.println("POST /input/lzx6o9YYWxTVrDyDDL0K/ HTTP/1.1");
+    client.println("Host: data.sparkfun.com");
     client.println("User-Agent: arduino-ethernet");
     client.println("Connection: close");
-
+    client.println("Phant-Private-Key: El2pn8BBo2Tz6AoAA4kM");
     client.println("Content-Type: application/x-www-form-urlencoded; charset=UTF-8");
-    client.print("Content-Length: ");
-    client.println(PostData.length());
+    client.println("Content-Length: ");
+    client.print(PostData.length());
     client.println();
     client.println(PostData);
     client.println();
