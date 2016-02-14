@@ -14,7 +14,7 @@
 
 // Output
 #include <LiquidCrystal_I2C.h>
-
+#include <SPI.h>
 
 /************************* Broker connection *********************************/
 #define BROKER_SERVER      "telemetry.wottonpool.co.uk"
@@ -91,11 +91,19 @@ unsigned long lastTick;
 long timeBetweenTicks = 0;
 float litersPerSec = 0;
 
+// SPI Pot to control pump Speed
+const int ssPump = 10;
+
 
 /*************************** Sketch Code ************************************/
 void setup() {
     Serial.begin(9600);
     Ethernet.begin(mac);
+
+    // SPI POT
+    pinMode (ssPump, OUTPUT);
+    SPI.begin();
+
     delay(1000); // Give Ethernet a second
 
     Serial.println(Ethernet.localIP());
@@ -135,7 +143,8 @@ void loop() {
         } else if (subscription == &pump) {
             Serial.print(F("Pump Speed: "));
             Serial.println((char *)pumpspeed.lastread);
-        }
+            // TODO, this prolly needs to be a byte or something
+            // digitalPotWrite(pumpspeed.lastread);
         }
     }
 
@@ -219,4 +228,13 @@ void MQTT_connect() {
         delay(5000);
     }
     Serial.println("MQTT Connected!");
+}
+
+void digitalPotWrite(byte value) {
+  // take the SS pin low to select the chip:
+  digitalWrite(ssPump, LOW);
+  SPI.transfer(B00010001); // The command byte
+  SPI.transfer(value);     // The data byte
+  // take the SS pin high to de-select the chip
+  digitalWrite(ssPump, HIGH);
 }
