@@ -1,4 +1,14 @@
 
+// Pins used.
+// Ethernet     10 ss, 11 mosi,12 miso,13 sck - SPI
+// POT          9 ss, 11 mosi,12 miso,13 sck - SPI
+// Lux          A4 sda, A5 scl - I2C
+// LCD          A4 sda, A5 scl - I2C
+// Temp         7 - W1
+// Flow         3 - digital input
+// Pump Relay   4 - digital output
+
+
 // Networking
 #include <SPI.h>
 #include <Ethernet.h>
@@ -92,7 +102,9 @@ long timeBetweenTicks = 0;
 float litersPerSec = 0;
 
 // SPI Pot to control pump Speed
-const int ssPump = 10;
+const int ssPump = 9;
+const int pumpRelayPin = 4;
+
 
 
 /*************************** Sketch Code ************************************/
@@ -100,8 +112,11 @@ void setup() {
     Serial.begin(9600);
     Ethernet.begin(mac);
 
+    pinMode(pumpRelayPin, OUTPUT);
+    pinMode(flowMeterPin, INPUT);
+    
     // SPI POT
-    pinMode (ssPump, OUTPUT);
+    pinMode(ssPump, OUTPUT);
     SPI.begin();
 
     delay(1000); // Give Ethernet a second
@@ -110,6 +125,7 @@ void setup() {
 
     // Setup subscriptions. Max 5
     mqtt.subscribe(&pump);
+    mqtt.subscribe(&pumpspeed);
 
     // Startup display sequence
     lcd.setCursor(0, 0);
@@ -123,7 +139,6 @@ void setup() {
     // Setup light sensor
     tsl.setGain(TSL2561_GAIN_0X);         // set no gain (for bright situtations)
     tsl.setTiming(TSL2561_INTEGRATIONTIME_13MS);  // shortest integration time (bright light)
-
 }
 
 void loop() {
@@ -136,16 +151,24 @@ void loop() {
     // 'wait for incoming subscription packets' busy subloop
     Adafruit_MQTT_Subscribe *subscription;
     while ((subscription = mqtt.readSubscription(1000))) {
-        if (subscription == &pump) {
+        if (subscription == &pumpspeed) {
+            Serial.print(F("Pump Speed: "));
+            byte pumpVal = atoi((char *)pumpspeed.lastread);
+            digitalPotWrite(pumpVal);
+            Serial.println(pumpVal);
+        }
+        
+        else if (subscription == &pump) {
             Serial.print(F("Pump: "));
             Serial.println((char *)pump.lastread);
+            if (strcmp((char *)pump.lastread, "ON") == 0) {
+              digitalWrite(pumpRelayPin, LOW); 
+            }
+            if (strcmp((char *)pump.lastread, "OFF") == 0) {
+              digitalWrite(pumpRelayPin, HIGH); 
+            }
 
-        } else if (subscription == &pump) {
-            Serial.print(F("Pump Speed: "));
-            Serial.println((char *)pumpspeed.lastread);
-            // TODO, this prolly needs to be a byte or something
-            // digitalPotWrite(pumpspeed.lastread);
-        }
+        }  
     }
 
     /// LIGHT ___________________________________
