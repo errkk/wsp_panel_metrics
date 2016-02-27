@@ -61,6 +61,9 @@ Adafruit_MQTT_Publish t2Feed = Adafruit_MQTT_Publish(&mqtt, TEMPERATURE_FEED_2);
 const char TEMPERATURE_FEED_3[] PROGMEM = BROKER_USERNAME "/sensor/t3";
 Adafruit_MQTT_Publish t3Feed = Adafruit_MQTT_Publish(&mqtt, TEMPERATURE_FEED_3);
 
+const char FLOW_FEED[] PROGMEM = BROKER_USERNAME "/sensor/flow";
+Adafruit_MQTT_Publish flowFeed = Adafruit_MQTT_Publish(&mqtt, FLOW_FEED);
+
 const char PUMP_FEED[] PROGMEM = BROKER_USERNAME "/hardware/pump";
 Adafruit_MQTT_Subscribe pump = Adafruit_MQTT_Subscribe(&mqtt, PUMP_FEED);
 const char PUMP_SPEED_FEED[] PROGMEM = BROKER_USERNAME "/hardware/pumpspeed";
@@ -72,6 +75,9 @@ TSL2561 tsl(TSL2561_ADDR_FLOAT);
 
 // I2C Display
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
+
+// I2C Flow Meter
+#define FLOW_METER_ADDR 0x11
 
 // Temp sensors
 #define ONE_WIRE_BUS 7
@@ -97,9 +103,10 @@ int lastFlowState = 0;
 
 float power = 0;
 
-unsigned long lastTick;
-long timeBetweenTicks = 0;
+// Flow meter
+#define FLOW_METER_ADDR 0x11
 float litersPerSec = 0;
+float lastFlow;
 
 // SPI Pot to control pump Speed
 const int ssPump = 9;
@@ -112,8 +119,10 @@ void setup() {
     Serial.begin(9600);
     Ethernet.begin(mac);
 
+    // Start I2C Bus for flowmeter
+    Wire.begin();
+
     pinMode(pumpRelayPin, OUTPUT);
-    pinMode(flowMeterPin, INPUT);
     
     // SPI POT
     pinMode(ssPump, OUTPUT);
@@ -139,6 +148,8 @@ void setup() {
     // Setup light sensor
     tsl.setGain(TSL2561_GAIN_0X);         // set no gain (for bright situtations)
     tsl.setTiming(TSL2561_INTEGRATIONTIME_13MS);  // shortest integration time (bright light)
+
+    sensors.begin();
 }
 
 void loop() {
@@ -204,6 +215,16 @@ void loop() {
     }
 
     float uplift = t2 - t1;
+    litersPerSec = readFlowMeter();
+    
+    // Publish if changed from last time
+
+    if(lastFlow != litersPerSec) {
+      lastFlow = litersPerSec;
+      Serial.println(lastFlow);
+      flowFeed.publish(litersPerSec);      
+    }
+    
     float power = 1000.0 * litersPerSec * uplift * 4.2;
 
     // Display temps
@@ -251,6 +272,21 @@ void MQTT_connect() {
         delay(5000);
     }
     Serial.println("MQTT Connected!");
+}
+
+float readFlowMeter(void) {
+  byte lowByte;
+  byte highByte;
+  Wire.requestFrom(FLOW_METER_ADDR, 1); 
+  if (Wire.available()) {
+   lowByte = Wire.read();
+  }
+  Wire.requestFrom(FLOW_METER_ADDR, 1); 
+  if (Wire.available()) {
+   highByte = Wire.read();
+  }
+  uint16_t value =  ((highByte << 8) + lowByte);
+  return (float)value/100;
 }
 
 void digitalPotWrite(byte value) {
