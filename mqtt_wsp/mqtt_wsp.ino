@@ -5,7 +5,7 @@
 // Lux          A4 sda, A5 scl - I2C
 // LCD          A4 sda, A5 scl - I2C
 // Temp         7 - W1
-// Flow         3 - digital input
+// Flow         A4 sda, A5 scl - I2C
 // Pump Relay   4 - digital output
 
 
@@ -192,8 +192,8 @@ void loop() {
     lcd.print(lux, DEC);
 
     // Send light data
-    // photocell.publish((uint32_t)lux);
-    photocell.publish(x++);
+    photocell.publish((uint32_t)lux);
+    //photocell.publish(x++);
 
     /// TEMPERAURE _______________________________
     sensors.requestTemperatures();
