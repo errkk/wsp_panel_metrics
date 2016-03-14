@@ -2,10 +2,10 @@
 // Pins used.
 // Ethernet     10 ss, 11 mosi,12 miso,13 sck - SPI
 // POT          9 ss, 11 mosi,12 miso,13 sck - SPI
-// Lux          A4 sda, A5 scl - I2C
-// LCD          A4 sda, A5 scl - I2C
+// Lux          A4 sda, A5 scl - I2C 0x39
+// LCD          A4 sda, A5 scl - I2C 0x27
 // Temp         7 - W1
-// Flow         A4 sda, A5 scl - I2C
+// Flow         A4 sda, A5 scl - I2C 0x11
 // Pump Relay   4 - digital output
 
 
@@ -16,11 +16,12 @@
 #include "Adafruit_MQTT.h"
 #include "Adafruit_MQTT_Client.h"
 
-// Sensors
+// w1_sensors
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <Wire.h>
-#include "TSL2561.h"
+#include <Adafruit_Sensor.h>
+#include <Adafruit_TSL2561_U.h>
 
 // Output
 #include <LiquidCrystal_I2C.h>
@@ -71,7 +72,7 @@ Adafruit_MQTT_Subscribe pumpspeed = Adafruit_MQTT_Subscribe(&mqtt, PUMP_SPEED_FE
 
 /*************************** Setup Peripherals ************************************/
 // Lux sensor
-TSL2561 tsl(TSL2561_ADDR_FLOAT);
+Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT);
 
 // I2C Display
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
@@ -79,10 +80,10 @@ LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 // I2C Flow Meter
 #define FLOW_METER_ADDR 0x11
 
-// Temp sensors
+// Temp w1_sensors
 #define ONE_WIRE_BUS 7
 OneWire oneWire(ONE_WIRE_BUS);
-DallasTemperature sensors(&oneWire);
+DallasTemperature w1_sensors(&oneWire);
 
 // Temperature Vars
 float t1;
@@ -91,16 +92,9 @@ float t3;
 
 // Var to hold light reading
 uint16_t lux;
-uint32_t x=0; // TMP
+const float wm2 = 0.0079;
 
 // Power vars
-const int flowMeterPin = 3;
-float litersPerTick = 10.0;
-
-int flowCounter = 0;
-int flowState = 0;
-int lastFlowState = 0;
-
 float power = 0;
 
 // Flow meter
@@ -121,6 +115,8 @@ void setup() {
 
     // Start I2C Bus for flowmeter
     Wire.begin();
+    
+    lcd.begin(20, 4);
 
     pinMode(pumpRelayPin, OUTPUT);
     
@@ -142,14 +138,12 @@ void setup() {
     lcd.setCursor(0, 1);
     lcd.print("IP: ");
     lcd.print(Ethernet.localIP());
-    delay(2000);
-    lcd.clear();
 
     // Setup light sensor
-    tsl.setGain(TSL2561_GAIN_0X);         // set no gain (for bright situtations)
-    tsl.setTiming(TSL2561_INTEGRATIONTIME_13MS);  // shortest integration time (bright light)
+    tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS);
+    tsl.enableAutoRange(true);
 
-    sensors.begin();
+    w1_sensors.begin();
 }
 
 void loop() {
@@ -173,34 +167,44 @@ void loop() {
             Serial.print(F("Pump: "));
             Serial.println((char *)pump.lastread);
             if (strcmp((char *)pump.lastread, "ON") == 0) {
-              digitalWrite(pumpRelayPin, LOW); 
+              digitalWrite(pumpRelayPin, HIGH); 
             }
             if (strcmp((char *)pump.lastread, "OFF") == 0) {
-              digitalWrite(pumpRelayPin, HIGH); 
+              digitalWrite(pumpRelayPin, LOW); 
             }
 
         }  
     }
 
     /// LIGHT ___________________________________
-    lux = tsl.getLuminosity(TSL2561_VISIBLE);
+    sensors_event_t event;
+    
+    tsl.getEvent(&event);
+    
 
-    // Display light
-    lcd.setCursor(10, 2);
-    lcd.print("Lux: "); // Blank it out
-    lcd.setCursor(13, 2);
-    lcd.print(lux, DEC);
+   
+    /* Display the results (light is measured in lux) */
+    if (event.light)
+    {
+      Serial.print(event.light); Serial.println(" lux");
+//      lux = event.light;
+      
+      // Display light
+      lcd.setCursor(10, 1);
+      lcd.print("Lux: "); // Blank it out
+      lcd.setCursor(15, 1);
+//      lcd.print(event.light); // byte mismatch or something
+      // Send light data
+      photocell.publish(event.light);
 
-    // Send light data
-    photocell.publish((uint32_t)lux);
-    //photocell.publish(x++);
+    }
 
     /// TEMPERAURE _______________________________
-    sensors.requestTemperatures();
+    w1_sensors.requestTemperatures();
 
-    float tt1 = sensors.getTempCByIndex(0);
-    float tt2 = sensors.getTempCByIndex(1);
-    float tt3 = sensors.getTempCByIndex(2);
+    float tt1 = w1_sensors.getTempCByIndex(0);
+    float tt2 = w1_sensors.getTempCByIndex(1);
+    float tt3 = w1_sensors.getTempCByIndex(2);
 
     if(tt1 > 0) {
         t1 = tt1;
@@ -226,7 +230,7 @@ void loop() {
     }
     
     float power = 1000.0 * litersPerSec * uplift * 4.2;
-
+    
     // Display temps
     lcd.setCursor(0, 0);
     lcd.print("In: ");
@@ -235,14 +239,19 @@ void loop() {
     lcd.print("Out: ");
     lcd.print(t2);
     lcd.setCursor(0, 1);
-    lcd.print("Tank: ");
+    lcd.print("Tk: ");
     lcd.print(t3);
 
     // Display power
     lcd.setCursor(0, 2);
-    lcd.print("Pow:      ");
-    lcd.setCursor(5, 2);
+    lcd.print("Power:      ");
+    lcd.setCursor(7, 2);
     lcd.print(power);
+    
+    lcd.setCursor(0, 3);
+    lcd.print("Flow:      ");
+    lcd.setCursor(6, 3);
+    lcd.print(litersPerSec);
 
     // Send temp data
     t1Feed.publish(t1);
@@ -264,14 +273,19 @@ void MQTT_connect() {
     }
 
     Serial.print("Connecting to MQTT... ");
+    lcd.setCursor(0, 2);
+    lcd.print("Connecting to server");
 
     while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
         Serial.println(mqtt.connectErrorString(ret));
         Serial.println("Retrying MQTT connection in 5 seconds...");
+        lcd.setCursor(0, 3);
+        lcd.print("Retrying");
         mqtt.disconnect();
         delay(5000);
     }
     Serial.println("MQTT Connected!");
+    lcd.clear();
 }
 
 float readFlowMeter(void) {
@@ -286,6 +300,7 @@ float readFlowMeter(void) {
    highByte = Wire.read();
   }
   uint16_t value =  ((highByte << 8) + lowByte);
+  Serial.println((float)value/100);
   return (float)value/100;
 }
 
