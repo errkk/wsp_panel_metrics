@@ -140,7 +140,7 @@ void setup() {
     lcd.print(Ethernet.localIP());
 
     // Setup light sensor
-    tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS);
+    tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);
     tsl.enableAutoRange(true);
 
     w1_sensors.begin();
@@ -161,9 +161,7 @@ void loop() {
             byte pumpVal = atoi((char *)pumpspeed.lastread);
             digitalPotWrite(pumpVal);
             Serial.println(pumpVal);
-        }
-        
-        else if (subscription == &pump) {
+        } else if (subscription == &pump) {
             Serial.print(F("Pump: "));
             Serial.println((char *)pump.lastread);
             if (strcmp((char *)pump.lastread, "ON") == 0) {
@@ -178,17 +176,15 @@ void loop() {
 
     /// LIGHT ___________________________________
     sensors_event_t event;
-    
     tsl.getEvent(&event);
-    
 
-   
+
     /* Display the results (light is measured in lux) */
     if (event.light)
     {
       Serial.print(event.light); Serial.println(" lux");
 //      lux = event.light;
-      
+
       // Display light
       lcd.setCursor(10, 1);
       lcd.print("Lux: "); // Blank it out
