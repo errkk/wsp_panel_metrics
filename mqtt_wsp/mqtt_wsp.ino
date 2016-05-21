@@ -27,7 +27,7 @@
 //#include <LiquidCrystal_I2C.h>
 
 /************************* Broker connection *********************************/
-#define BROKER_SERVER      "telemetry.wottonpool.co.uk"
+#define BROKER_SERVER      "178.62.69.43"
 #define BROKER_SERVERPORT  1883
 #define BROKER_USERNAME    "wsp"
 
@@ -91,6 +91,7 @@ float t3;
 // Flow meter
 #define FLOW_METER_ADDR 0x11
 float litersPerSec = 0;
+float flow = 0;
 
 // SPI Pot to control pump Speed
 const int ssPump = 9;
@@ -196,13 +197,17 @@ void loop() {
       t3Feed.publish(t3);
     }
 
-    float flow = readFlowMeter();
+    readFlowMeter();
     
     if(flow != litersPerSec) {
       litersPerSec = flow;
       Serial.print("Flow: ");
       Serial.println(litersPerSec);
       flowFeed.publish(litersPerSec);
+    }
+
+    if(! mqtt.ping()) {
+     mqtt.disconnect();
     }
 }
 
@@ -226,7 +231,7 @@ void MQTT_connect() {
     Serial.println("MQTT Connected!");
 }
 
-float readFlowMeter(void) {
+void readFlowMeter(void) {
   byte lowByte;
   byte highByte;
   Wire.requestFrom(FLOW_METER_ADDR, 1); 
@@ -238,9 +243,9 @@ float readFlowMeter(void) {
    highByte = Wire.read();
   }
   uint16_t value =  ((highByte << 8) + lowByte);
-  Serial.print("Flow Data: ");
-  Serial.println((float)value/100);
-  return (float)value/100;
+  Serial.print("Reading flow data: ");
+  Serial.println(value);
+  flow = value/100;
 }
 
 void digitalPotWrite(byte value) {
