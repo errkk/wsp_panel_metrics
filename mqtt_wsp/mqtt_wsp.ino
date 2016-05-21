@@ -118,11 +118,8 @@ void setup() {
     pinMode(ssPump, OUTPUT);
     pinMode(pumpRelayPin, OUTPUT);
 
-    Serial.println("TSL");
-
     // Setup light sensor
     tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS);
-    //tsl.enableAutoRange(true);
     tsl.setGain(TSL2561_GAIN_1X);
 
     Serial.println("Connecting");
@@ -197,6 +194,7 @@ void loop() {
       t3Feed.publish(t3);
     }
 
+    // Uppdate value stored in flow
     readFlowMeter();
     
     if(flow != litersPerSec) {
@@ -207,7 +205,7 @@ void loop() {
     }
 
     if(! mqtt.ping()) {
-     mqtt.disconnect();
+      mqtt.disconnect();
     }
 }
 
@@ -224,7 +222,7 @@ void MQTT_connect() {
 
     while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
         Serial.println(mqtt.connectErrorString(ret));
-        Serial.println("Retrying MQTT connection in 5 seconds...");
+        Serial.println("Retrying MQTT connection in 2 seconds...");
         mqtt.disconnect();
         delay(2000);
     }
@@ -243,8 +241,6 @@ void readFlowMeter(void) {
    highByte = Wire.read();
   }
   uint16_t value =  ((highByte << 8) + lowByte);
-  Serial.print("Reading flow data: ");
-  Serial.println(value);
   flow = value/100;
 }
 
