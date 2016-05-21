@@ -74,7 +74,6 @@ Adafruit_MQTT_Subscribe pumpspeed = Adafruit_MQTT_Subscribe(&mqtt, PUMP_SPEED_FE
 Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT);
 float lux;
 
-
 // I2C Display
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 
@@ -96,6 +95,10 @@ float flow = 0;
 // SPI Pot to control pump Speed
 const int ssPump = 9;
 const int pumpRelayPin = 4;
+
+// Calcs
+int insolation;
+int power;
 
 
 /*************************** Sketch Code ************************************/
@@ -180,6 +183,8 @@ void loop() {
         lux = event.light;  
         photocell.publish(lux);
         //Serial.print(lux); Serial.println(" lux");
+        // calc light power here
+        insolation = 0.0079 * lux;
       }
     }
 
@@ -212,6 +217,7 @@ void loop() {
       Serial.print("Flow: ");
       Serial.println(litersPerSec);
       flowFeed.publish(litersPerSec);
+      // calc power here
     }
 
     if(! mqtt.ping()) {
@@ -262,3 +268,38 @@ void digitalPotWrite(byte value) {
   // take the SS pin high to de-select the chip
   digitalWrite(ssPump, HIGH);
 }
+
+void displayTemps(void) {
+  lcd.setCursor(0, 0);
+  lcd.print("In:       Out:      ");
+  lcd.setCursor(3, 0);
+  lcd.print(t1);
+  lcd.setCursor(14, 0);
+  lcd.print(t2);
+}
+
+void displayFlow(void) {
+  lcd.setCursor(0, 1);
+  lcd.print("Flw:     l/s     %  ");
+  lcd.setCursor(4, 1);
+  lcd.print(litersPerSec);
+  lcd.setCursor(14, 1);
+  lcd.print(map(pumpVal, 0, 1023, 0, 99));  
+}
+
+void displayPower(void) {
+  lcd.setCursor(0, 2);
+  lcd.print("Pow:    W Sun:    W ");
+  lcd.setCursor(4, 2);
+  lcd.print(getPower());
+  lcd.setCursor(14, 2);
+  lcd.print(insolation);
+}
+
+float getPower() {
+  float uplift = t2 - t1;
+  float grams = 1000.0 * litersPerSec / 60;
+  power = uplift * grams * 4.2;
+  return power;
+}
+
