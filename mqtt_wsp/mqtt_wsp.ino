@@ -76,7 +76,7 @@ float lux;
 
 
 // I2C Display
-//LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
+LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 
 // Temp w1_sensors
 #define ONE_WIRE_BUS 7
@@ -107,12 +107,21 @@ void setup() {
     SPI.begin();
     Wire.begin();  
     w1_sensors.begin(); 
+    lcd.begin(20, 4);
+
+    lcd.setCursor(0, 0);
+    lcd.print("Starting up");
+    lcd.backlight();
 
     Serial.println("Trying to do Ethernet");
     if(Ethernet.begin(mac) == 0) {
         Serial.println("Ethernet Fail");
     }
-    Serial.println(Ethernet.localIP());    
+    Serial.println(Ethernet.localIP()); 
+
+    lcd.setCursor(0, 0);
+    lcd.print("IP: ");
+    lcd.print(Ethernet.localIP());    
 
     // Pump Control. SS and OPTO
     pinMode(ssPump, OUTPUT);
@@ -126,7 +135,8 @@ void setup() {
 
     // Setup subscriptions. Max 5
     mqtt.subscribe(&pump);
-    mqtt.subscribe(&pumpspeed);    
+    mqtt.subscribe(&pumpspeed);
+    lcd.clear();    
 }
 
 void loop() {
