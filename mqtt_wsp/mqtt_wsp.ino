@@ -237,6 +237,9 @@ void MQTT_connect() {
     }
 
     Serial.print("Connecting to MQTT... ");
+    lcd.clear();
+    lcd.setCursor(0, 1);
+    lcd.print("Connecting MQTT");
 
     while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
         Serial.println(mqtt.connectErrorString(ret));
@@ -245,6 +248,8 @@ void MQTT_connect() {
         delay(2000);
     }
     Serial.println("MQTT Connected!");
+    lcd.setCursor(0, 2);
+    lcd.print("Connected");
 }
 
 void readFlowMeter(void) {
