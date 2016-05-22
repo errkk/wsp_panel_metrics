@@ -24,7 +24,7 @@
 #include <Adafruit_TSL2561_U.h>
 
 // Output
-//#include <LiquidCrystal_I2C.h>
+#include <LiquidCrystal_I2C.h>
 
 /************************* Broker connection *********************************/
 #define BROKER_SERVER      "178.62.69.43"
@@ -99,6 +99,7 @@ const int pumpRelayPin = 4;
 // Calcs
 int insolation;
 int power;
+int pumpSpeed;
 
 
 /*************************** Sketch Code ************************************/
@@ -159,6 +160,7 @@ void loop() {
             byte pumpVal = atoi((char *)pumpspeed.lastread);
             digitalPotWrite(pumpVal);
             Serial.println(pumpVal);
+            displayFlow();
         } else if (subscription == &pump) {
             Serial.print(F("Pump: "));
             Serial.println((char *)pump.lastread);
@@ -183,10 +185,9 @@ void loop() {
         lux = event.light;  
         photocell.publish(lux);
         //Serial.print(lux); Serial.println(" lux");
-        // calc light power here
-        insolation = 0.0079 * lux;
       }
     }
+    displayPower();
 
     /// TEMPERAURE _______________________________
     w1_sensors.requestTemperatures();
@@ -208,6 +209,7 @@ void loop() {
       t3 = tt3;
       t3Feed.publish(t3);
     }
+    displayTemp();
 
     // Uppdate value stored in flow
     readFlowMeter();
@@ -217,7 +219,7 @@ void loop() {
       Serial.print("Flow: ");
       Serial.println(litersPerSec);
       flowFeed.publish(litersPerSec);
-      // calc power here
+      displayFlow();
     }
 
     if(! mqtt.ping()) {
@@ -261,6 +263,7 @@ void readFlowMeter(void) {
 }
 
 void digitalPotWrite(byte value) {
+  pumpSpeed = value;
   // take the SS pin low to select the chip:
   digitalWrite(ssPump, LOW);
   SPI.transfer(B00010001); // The command byte
@@ -280,20 +283,24 @@ void displayTemps(void) {
 
 void displayFlow(void) {
   lcd.setCursor(0, 1);
-  lcd.print("Flw:     l/s     %  ");
+  lcd.print("Flw:                ");
   lcd.setCursor(4, 1);
   lcd.print(litersPerSec);
+  lcd.print("l/s");
   lcd.setCursor(14, 1);
-  lcd.print(map(pumpVal, 0, 1023, 0, 99));  
+  lcd.print(map(pumpSpeed, 0, 255, 0, 99));
+  lcd.print("%");
 }
 
 void displayPower(void) {
   lcd.setCursor(0, 2);
-  lcd.print("Pow:    W Sun:    W ");
+  lcd.print("Pow:      Sun:      ");
   lcd.setCursor(4, 2);
   lcd.print(getPower());
+  lcd.print("W");
   lcd.setCursor(14, 2);
-  lcd.print(insolation);
+  lcd.print(getInsolation());
+  lcd.print("W");
 }
 
 float getPower() {
@@ -301,5 +308,10 @@ float getPower() {
   float grams = 1000.0 * litersPerSec / 60;
   power = uplift * grams * 4.2;
   return power;
+}
+
+float getInsolation() {
+  insolation = lux * 0.0079;
+  return insolation;
 }
 
