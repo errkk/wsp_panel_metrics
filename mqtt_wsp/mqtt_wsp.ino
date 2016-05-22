@@ -135,8 +135,6 @@ void setup() {
     tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS);
     tsl.setGain(TSL2561_GAIN_1X);
 
-    Serial.println("Connecting");
-
     // Setup subscriptions. Max 5
     mqtt.subscribe(&pump);
     mqtt.subscribe(&pumpspeed);
@@ -264,7 +262,7 @@ void readFlowMeter(void) {
    highByte = Wire.read();
   }
   uint16_t value =  ((highByte << 8) + lowByte);
-  flow = value/100;
+  flow = (float)value/100;
 }
 
 void digitalPotWrite(byte value) {
@@ -277,7 +275,7 @@ void digitalPotWrite(byte value) {
   digitalWrite(ssPump, HIGH);
 }
 
-void displayTemps(void) {
+void displayTemp(void) {
   lcd.setCursor(0, 0);
   lcd.print("In:       Out:      ");
   lcd.setCursor(3, 0);

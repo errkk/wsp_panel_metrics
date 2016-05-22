@@ -34,13 +34,6 @@ byte highByte;
  */
 void requestEvent()
 {  
-
-  union float2bytes { float f; char b[sizeof(float)]; };
-  
-  float2bytes f2b;
-  
-  f2b.f = litersPerSec;
-
   if(firstbyte == true){     // on the first byte we do the math
     // x 100
     int intlitersPerSecX10 = (int) litersPerSec * 10;
@@ -77,7 +70,7 @@ void loop() {
       
       timeBetweenTicks = newTime - lastTick;
 
-      if(timeBetweenTicks > 100) {
+      if(timeBetweenTicks > 500) {
         lastTick = newTime;
         litersPerSec = litersPerTick / (timeBetweenTicks / 1000.0);
         digitalWrite(LED, HIGH);
