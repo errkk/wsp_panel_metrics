@@ -220,7 +220,13 @@ void loop() {
     }
     
     photocell.publish(lux);    
-    flowFeed.publish(litersPerSec);        
+    
+    if(pumpState > 0) {
+      flowFeed.publish(litersPerSec);
+    } else {
+      flowFeed.publish("0");
+    }
+    
     t1Feed.publish(t1);
     t2Feed.publish(t2);
     t3Feed.publish(t3);
@@ -291,12 +297,17 @@ void displayTemp(void) {
 void displayFlow(void) {
   lcd.setCursor(0, 1);
   lcd.print("Flw:                ");
-  lcd.setCursor(4, 1);
-  lcd.print(litersPerSec);
+  lcd.setCursor(5, 1);
+  if(pumpState > 0) {
+    lcd.print(litersPerSec);
+  } else {
+    lcd.print(0);
+  }
   lcd.print("l/s");
+  
   lcd.setCursor(14, 1);
   if(pumpState > 0) {
-    lcd.print(map(pumpSpeed, 255, 0, 0, 99));  
+    lcd.print(map(pumpSpeed, 255, 0, 0, 100));  
     lcd.print("%");
   } else { 
     lcd.print("Off");
@@ -305,14 +316,21 @@ void displayFlow(void) {
 
 void displayPower(void) {
   lcd.setCursor(0, 2);
-  lcd.print("Pow:      Sun:    ");
-  lcd.setCursor(4, 2);
+  lcd.print("Power:             ");
+  lcd.setCursor(7, 2);
   getPower();
-  lcd.print(power, DEC);
-  lcd.print("W");
-  lcd.setCursor(14, 2);
+  if(pumpState > 0) {
+    lcd.print(power, DEC);
+  } else {
+    lcd.print("0");
+  }
+  lcd.print(" W");
+  
+  lcd.setCursor(0, 3);
+  lcd.print("Sun:               ");
+  lcd.setCursor(5, 3);
   lcd.print(getInsolation());
-  lcd.print("W");
+  lcd.print(" W/m2");
 }
 
 float getPower() {
