@@ -18,10 +18,10 @@ uint8_t flowState = 0;
 uint8_t lastFlowState = 0;
 
 unsigned long lastTick;
-unsigned long timeBetweenTicks = 0;
-const int litersPerTick = 10;
+unsigned long timeBetweenTicks = 30000;
+const float litersPerTick = 10.0; // for arithmatic with millis
 
-volatile float litersPerSec = 0; // 4 bytes
+volatile float litersPerSec = 0.332; // 4 bytes
 
 // Buffers for sending int over I2C
 boolean firstbyte = true;
@@ -36,9 +36,9 @@ void requestEvent()
 {  
   if(firstbyte == true){     // on the first byte we do the math
     // x 100
-    int intlitersPerSecX10 = (int) litersPerSec * 10;
-    lowByte = (byte) (intlitersPerSecX10 & 0xff);
-    highByte = (byte) ((intlitersPerSecX10 >> 8) & 0xff);
+    uint8_t intlitersPerSecX100 = litersPerSec * 100.00;
+    lowByte = (byte) (intlitersPerSecX100 & 0xff);
+    highByte = (byte) ((intlitersPerSecX100 >> 8) & 0xff);
     firstbyte = false;      //so next time though we send the next byte    
     TinyWireS.send(lowByte);
   } 

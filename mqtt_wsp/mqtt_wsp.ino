@@ -82,6 +82,10 @@ LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature w1_sensors(&oneWire);
 
+DeviceAddress in = { 0x28, 0x88, 0xAF, 0xBD, 0x04, 0x00, 0x00, 0x9B };
+DeviceAddress out = { 0x28, 0xFF, 0xFA, 0x27, 0x63, 0x14, 0x02, 0x8F };
+DeviceAddress tank = { 0x28, 0xFF, 0x0F, 0x17, 0x63, 0x14, 0x02, 0xB3 };
+
 // Temperature Vars
 float t1;
 float t2;
@@ -95,6 +99,7 @@ float flow = 0;
 // SPI Pot to control pump Speed
 const int ssPump = 9;
 const int pumpRelayPin = 4;
+int pumpState = 0; 
 
 // Calcs
 int insolation;
@@ -123,7 +128,7 @@ void setup() {
     }
     Serial.println(Ethernet.localIP()); 
 
-    lcd.setCursor(0, 0);
+    lcd.setCursor(0, 1);
     lcd.print("IP: ");
     lcd.print(Ethernet.localIP());    
 
@@ -138,7 +143,6 @@ void setup() {
     // Setup subscriptions. Max 5
     mqtt.subscribe(&pump);
     mqtt.subscribe(&pumpspeed);
-    lcd.clear();    
 }
 
 void loop() {
@@ -158,16 +162,18 @@ void loop() {
             byte pumpVal = atoi((char *)pumpspeed.lastread);
             digitalPotWrite(pumpVal);
             Serial.println(pumpVal);
-            displayFlow();
         } else if (subscription == &pump) {
-            Serial.print(F("Pump: "));
-            Serial.println((char *)pump.lastread);
             if (strcmp((char *)pump.lastread, "ON") == 0) {
-              digitalWrite(pumpRelayPin, HIGH); 
+              digitalWrite(pumpRelayPin, HIGH);
+              pumpState = 1; 
             }
             if (strcmp((char *)pump.lastread, "OFF") == 0) {
               digitalWrite(pumpRelayPin, LOW); 
+              pumpState = 0; 
             }
+
+            Serial.print("Pump: ");
+            Serial.println(pumpState);
         }  
     }
 
@@ -181,34 +187,29 @@ void loop() {
       // Send light data
       if (event.light != lux) {
         lux = event.light;  
-        photocell.publish(lux);
-        //Serial.print(lux); Serial.println(" lux");
       }
     }
-    displayPower();
 
     /// TEMPERAURE _______________________________
     w1_sensors.requestTemperatures();
 
-    float tt1 = w1_sensors.getTempCByIndex(0);
-    float tt2 = w1_sensors.getTempCByIndex(1);
-    float tt3 = w1_sensors.getTempCByIndex(2);
+    float tt1 = w1_sensors.getTempC(in);
+    float tt2 = w1_sensors.getTempC(out);
+    float tt3 = w1_sensors.getTempC(tank);
     
     // Send temp data
     if(tt1 != t1 && tt1 > 0) {
       t1 = tt1;
-      t1Feed.publish(t1);
     }
     if(tt2 != t2 && tt2 > 0) {
       t2 = tt2;
-      t2Feed.publish(t2);
     }
     if(tt3 != t3 && tt3 > 0) {
       t3 = tt3;
-      t3Feed.publish(t3);
     }
-    displayTemp();
-
+    
+    
+    /// FLOW _______________________________
     // Uppdate value stored in flow
     readFlowMeter();
     
@@ -216,13 +217,17 @@ void loop() {
       litersPerSec = flow;
       Serial.print("Flow: ");
       Serial.println(litersPerSec);
-      flowFeed.publish(litersPerSec);
-      displayFlow();
     }
+    
+    photocell.publish(lux);    
+    flowFeed.publish(litersPerSec);        
+    t1Feed.publish(t1);
+    t2Feed.publish(t2);
+    t3Feed.publish(t3);
 
-    if(! mqtt.ping()) {
-      mqtt.disconnect();
-    }
+    displayPower();    
+    displayFlow();
+    displayTemp();
 }
 
 // Function to connect and reconnect as necessary to the MQTT server.
@@ -235,19 +240,19 @@ void MQTT_connect() {
     }
 
     Serial.print("Connecting to MQTT... ");
-    lcd.clear();
-    lcd.setCursor(0, 1);
+    lcd.setCursor(0, 2);
     lcd.print("Connecting MQTT");
 
     while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
         Serial.println(mqtt.connectErrorString(ret));
         Serial.println("Retrying MQTT connection in 2 seconds...");
+        lcd.setCursor(0, 3);
+        lcd.print("Trying again");
         mqtt.disconnect();
         delay(2000);
     }
     Serial.println("MQTT Connected!");
-    lcd.setCursor(0, 2);
-    lcd.print("Connected");
+    lcd.clear(); 
 }
 
 void readFlowMeter(void) {
@@ -291,13 +296,17 @@ void displayFlow(void) {
   lcd.print(litersPerSec);
   lcd.print("l/s");
   lcd.setCursor(14, 1);
-  lcd.print(map(pumpSpeed, 0, 255, 0, 99));
-  lcd.print("%");
+  if(pumpState > 0) {
+    lcd.print(map(pumpSpeed, 255, 0, 0, 99));  
+    lcd.print("%");
+  } else { 
+    lcd.print("Off");
+  }
 }
 
 void displayPower(void) {
   lcd.setCursor(0, 2);
-  lcd.print("Pow:      Sun:      ");
+  lcd.print("Pow:      Sun:    ");
   lcd.setCursor(4, 2);
   lcd.print(getPower());
   lcd.print("W");
