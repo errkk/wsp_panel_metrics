@@ -233,7 +233,6 @@ void loop() {
 // Function to connect and reconnect as necessary to the MQTT server.
 void MQTT_connect() {
     int8_t ret;
-
     // Stop if already connected.
     if (mqtt.connected()) {
         return;
@@ -308,7 +307,8 @@ void displayPower(void) {
   lcd.setCursor(0, 2);
   lcd.print("Pow:      Sun:    ");
   lcd.setCursor(4, 2);
-  lcd.print(getPower());
+  getPower();
+  lcd.print(power, DEC);
   lcd.print("W");
   lcd.setCursor(14, 2);
   lcd.print(getInsolation());
@@ -317,9 +317,9 @@ void displayPower(void) {
 
 float getPower() {
   float uplift = t2 - t1;
-  float grams = 1000.0 * litersPerSec / 60;
-  power = uplift * grams * 4.2;
-  return power;
+  power = uplift * litersPerSec * 1000.0 * 4.2;
+  // W
+  return (int) power;
 }
 
 float getInsolation() {
